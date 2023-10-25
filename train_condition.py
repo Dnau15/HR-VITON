@@ -296,7 +296,7 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                 
                 # discriminator
                 with torch.no_grad():
-                    _, fake_segmap, _, _ = tocg(input1, input2)
+                    _, fake_segmap, _, _ = tocg(opt, input1, input2)
                 fake_segmap_softmax = torch.softmax(fake_segmap, 1)
                 
                 # loss discriminator
@@ -338,7 +338,7 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                     input2 = torch.cat([parse_agnostic, densepose], 1)
                     
                     # forward
-                    flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(input1, input2)
+                    flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(opt, input1, input2)
                 
                     # fake segmap cloth channel * warped clothmask
                     if opt.clothmask_composition != 'no_composition':
