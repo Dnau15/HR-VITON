@@ -155,7 +155,7 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
         input2 = torch.cat([parse_agnostic, densepose], 1)
 
         # forward
-        flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(input1, input2)
+        flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(opt,input1, input2)
         
         # warped cloth mask one hot 
         
