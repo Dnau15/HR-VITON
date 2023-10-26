@@ -348,77 +348,52 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
             board.add_scalar('val/iou', np.mean(iou_list), step + 1)
         
         # tensorboard
-        if (step + 1) % opt.tensorboard_count == 0:
-            # loss G
-            board.add_scalar('Loss/G', loss_G.item(), step + 1)
-            board.add_scalar('Loss/G/l1_cloth', loss_l1_cloth.item(), step + 1)
-            board.add_scalar('Loss/G/vgg', loss_vgg.item(), step + 1)
-            board.add_scalar('Loss/G/tv', loss_tv.item(), step + 1)
-            board.add_scalar('Loss/G/CE', CE_loss.item(), step + 1)
-            if not opt.no_GAN_loss:
-                board.add_scalar('Loss/G/GAN', loss_G_GAN.item(), step + 1)
-                # loss D
-                board.add_scalar('Loss/D', loss_D.item(), step + 1)
-                board.add_scalar('Loss/D/pred_real', loss_D_real.item(), step + 1)
-                board.add_scalar('Loss/D/pred_fake', loss_D_fake.item(), step + 1)
-            
-            grid = make_grid([(c_paired[0].cpu() / 2 + 0.5), (cm_paired[0].cpu()).expand(3, -1, -1), visualize_segmap(parse_agnostic.cpu()), ((densepose.cpu()[0]+1)/2),
-                              (im_c[0].cpu() / 2 + 0.5), parse_cloth_mask[0].cpu().expand(3, -1, -1), (warped_cloth_paired[0].cpu().detach() / 2 + 0.5), (warped_cm_onehot[0].cpu().detach()).expand(3, -1, -1),
-                              visualize_segmap(label.cpu()), visualize_segmap(fake_segmap.cpu()), (im[0]/2 +0.5), (misalign[0].cpu().detach()).expand(3, -1, -1)],
-                                nrow=4)
-            board.add_images('train_images', grid.unsqueeze(0), step + 1)
-            
-            if not opt.no_test_visualize:
-                inputs = test_loader.next_batch()
-                # input1
-                c_paired = inputs['cloth'][opt.test_datasetting].cuda()
-                cm_paired = inputs['cloth_mask'][opt.test_datasetting].cuda()
-                cm_paired = torch.FloatTensor((cm_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
-                # input2
-                parse_agnostic = inputs['parse_agnostic'].cuda()
-                densepose = inputs['densepose'].cuda()
-                openpose = inputs['pose'].cuda()
-                # GT
-                label_onehot = inputs['parse_onehot'].cuda()  # CE
-                label = inputs['parse'].cuda()  # GAN loss
-                parse_cloth_mask = inputs['pcm'].cuda()  # L1
-                im_c = inputs['parse_cloth'].cuda()  # VGG
-                # visualization
-                im = inputs['image']
+        # if (step + 1) % opt.tensorboard_count == 0:
+        #     # loss G
+        #     if not opt.no_test_visualize:
+        #         inputs = test_loader.next_batch()
+        #         # input1
+        #         c_paired = inputs['cloth'][opt.test_datasetting].cuda()
+        #         cm_paired = inputs['cloth_mask'][opt.test_datasetting].cuda()
+        #         cm_paired = torch.FloatTensor((cm_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        #         # input2
+        #         parse_agnostic = inputs['parse_agnostic'].cuda()
+        #         densepose = inputs['densepose'].cuda()
+        #         openpose = inputs['pose'].cuda()
+        #         # GT
+        #         label_onehot = inputs['parse_onehot'].cuda()  # CE
+        #         label = inputs['parse'].cuda()  # GAN loss
+        #         parse_cloth_mask = inputs['pcm'].cuda()  # L1
+        #         im_c = inputs['parse_cloth'].cuda()  # VGG
+        #         # visualization
+        #         im = inputs['image']
 
-                tocg.eval()
-                with torch.no_grad():
-                    # inputs
-                    input1 = torch.cat([c_paired, cm_paired], 1)
-                    input2 = torch.cat([parse_agnostic, densepose], 1)
+        #         tocg.eval()
+        #         with torch.no_grad():
+        #             # inputs
+        #             input1 = torch.cat([c_paired, cm_paired], 1)
+        #             input2 = torch.cat([parse_agnostic, densepose], 1)
 
-                    # forward
-                    flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(opt, input1, input2)
+        #             # forward
+        #             flow_list, fake_segmap, warped_cloth_paired, warped_clothmask_paired = tocg(opt, input1, input2)
                     
-                    warped_cm_onehot = torch.FloatTensor((warped_clothmask_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
-                    if opt.clothmask_composition != 'no_composition':
-                        if opt.clothmask_composition == 'detach' or opt.clothmask_composition == 'warp_grad':
-                            cloth_mask = torch.ones_like(fake_segmap.detach())
-                            cloth_mask[:, 3:4, :, :] = warped_cm_onehot \
-                                if opt.clothmask_composition == 'detach' else warped_clothmask_paired
-                            fake_segmap = fake_segmap * cloth_mask
-                            
-                    if opt.occlusion:
-                        warped_clothmask_paired = remove_overlap(F.softmax(fake_segmap, dim=1), warped_clothmask_paired)
-                        warped_cloth_paired = warped_cloth_paired * warped_clothmask_paired + torch.ones_like(warped_cloth_paired) * (1-warped_clothmask_paired)
+        #             warped_cm_onehot = torch.FloatTensor((warped_clothmask_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        #             if opt.clothmask_composition != 'no_composition':
+        #                 if opt.clothmask_composition == 'detach' or opt.clothmask_composition == 'warp_grad':
+        #                     cloth_mask = torch.ones_like(fake_segmap.detach())
+        #                     cloth_mask[:, 3:4, :, :] = warped_cm_onehot \
+        #                         if opt.clothmask_composition == 'detach' else warped_clothmask_paired
+        #                     fake_segmap = fake_segmap * cloth_mask
+
+        #             if opt.occlusion:
+        #                 warped_clothmask_paired = remove_overlap(F.softmax(fake_segmap, dim=1), warped_clothmask_paired)
+        #                 warped_cloth_paired = warped_cloth_paired * warped_clothmask_paired + torch.ones_like(warped_cloth_paired) * (1-warped_clothmask_paired)
                     
-                    # generated fake cloth mask & misalign mask
-                    fake_clothmask = (torch.argmax(fake_segmap.detach(), dim=1, keepdim=True) == 3).long()
-                    misalign = fake_clothmask - warped_cm_onehot
-                    misalign[misalign < 0.0] = 0.0
-                
-                for i in range(opt.num_test_visualize):
-                    grid = make_grid([(c_paired[i].cpu() / 2 + 0.5), (cm_paired[i].cpu()).expand(3, -1, -1), visualize_segmap(parse_agnostic.cpu(), batch=i), ((densepose.cpu()[i]+1)/2),
-                                    (im_c[i].cpu() / 2 + 0.5), parse_cloth_mask[i].cpu().expand(3, -1, -1), (warped_cloth_paired[i].cpu().detach() / 2 + 0.5), (warped_cm_onehot[i].cpu().detach()).expand(3, -1, -1),
-                                    visualize_segmap(label.cpu(), batch=i), visualize_segmap(fake_segmap.cpu(), batch=i), (im[i]/2 +0.5), (misalign[i].cpu().detach()).expand(3, -1, -1)],
-                                        nrow=4)
-                    board.add_images(f'test_images/{i}', grid.unsqueeze(0), step + 1)
-                tocg.train()
+        #             # generated fake cloth mask & misalign mask
+        #             fake_clothmask = (torch.argmax(fake_segmap.detach(), dim=1, keepdim=True) == 3).long()
+        #             misalign = fake_clothmask - warped_cm_onehot
+        #             misalign[misalign < 0.0] = 0.0
+        #        tocg.train()
         
         # display
         if (step + 1) % opt.display_count == 0:
