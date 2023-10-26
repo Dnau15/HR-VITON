@@ -163,15 +163,12 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
         warped_cm_onehot = torch.FloatTensor((warped_clothmask_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
         # fake segmap cloth channel * warped clothmask
         if opt.clothmask_composition != 'no_composition':
-            if opt.clothmask_composition == 'detach':
+            if opt.clothmask_composition == 'detach' or opt.clothmask_composition == 'warp_grad':
                 cloth_mask = torch.ones_like(fake_segmap.detach())
-                cloth_mask[:, 3:4, :, :] = warped_cm_onehot
+                cloth_mask[:, 3:4, :, :] = warped_cm_onehot \
+                    if opt.clothmask_composition == 'detach' else warped_clothmask_paired
                 fake_segmap = fake_segmap * cloth_mask
                 
-            if opt.clothmask_composition == 'warp_grad':
-                cloth_mask = torch.ones_like(fake_segmap.detach())
-                cloth_mask[:, 3:4, :, :] = warped_clothmask_paired
-                fake_segmap = fake_segmap * cloth_mask
         if opt.occlusion:
             warped_clothmask_paired = remove_overlap(F.softmax(fake_segmap, dim=1), warped_clothmask_paired)
             warped_cloth_paired = warped_cloth_paired * warped_clothmask_paired + torch.ones_like(warped_cloth_paired) * (1-warped_clothmask_paired)
@@ -188,13 +185,7 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
         loss_tv = 0
         
         if opt.edgeawaretv == 'no_edge':
-            if not opt.lasttvonly:
-                for flow in flow_list:
-                    y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :]).mean()
-                    x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :]).mean()
-                    loss_tv = loss_tv + y_tv + x_tv
-            else:
-                for flow in flow_list[-1:]:
+            for flow in flow_list if not opt.lasttvonly else flow_list[-1:]:
                     y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :]).mean()
                     x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :]).mean()
                     loss_tv = loss_tv + y_tv + x_tv
@@ -343,14 +334,10 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                 
                     # fake segmap cloth channel * warped clothmask
                     if opt.clothmask_composition != 'no_composition':
-                        if opt.clothmask_composition == 'detach':
+                        if opt.clothmask_composition == 'detach' or opt.clothmask_composition == 'warp_grad':
                             cloth_mask = torch.ones_like(fake_segmap.detach())
-                            cloth_mask[:, 3:4, :, :] = warped_cm_onehot
-                            fake_segmap = fake_segmap * cloth_mask
-                            
-                        if opt.clothmask_composition == 'warp_grad':
-                            cloth_mask = torch.ones_like(fake_segmap.detach())
-                            cloth_mask[:, 3:4, :, :] = warped_clothmask_paired
+                            cloth_mask[:, 3:4, :, :] = warped_cm_onehot \
+                                if opt.clothmask_composition == 'detach' else warped_clothmask_paired
                             fake_segmap = fake_segmap * cloth_mask
     
                     # calculate iou
@@ -410,15 +397,12 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                     
                     warped_cm_onehot = torch.FloatTensor((warped_clothmask_paired.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
                     if opt.clothmask_composition != 'no_composition':
-                        if opt.clothmask_composition == 'detach':
-                            cloth_mask = torch.ones_like(fake_segmap)
-                            cloth_mask[:,3:4, :, :] = warped_cm_onehot
+                        if opt.clothmask_composition == 'detach' or opt.clothmask_composition == 'warp_grad':
+                            cloth_mask = torch.ones_like(fake_segmap.detach())
+                            cloth_mask[:, 3:4, :, :] = warped_cm_onehot \
+                                if opt.clothmask_composition == 'detach' else warped_clothmask_paired
                             fake_segmap = fake_segmap * cloth_mask
                             
-                        if opt.clothmask_composition == 'warp_grad':
-                            cloth_mask = torch.ones_like(fake_segmap)
-                            cloth_mask[:,3:4, :, :] = warped_clothmask_paired
-                            fake_segmap = fake_segmap * cloth_mask
                     if opt.occlusion:
                         warped_clothmask_paired = remove_overlap(F.softmax(fake_segmap, dim=1), warped_clothmask_paired)
                         warped_cloth_paired = warped_cloth_paired * warped_clothmask_paired + torch.ones_like(warped_cloth_paired) * (1-warped_clothmask_paired)
