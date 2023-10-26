@@ -7,7 +7,8 @@ from networks import make_grid as mkgrid
 import argparse
 import os
 import time
-from cp_dataset import CPDataset, CPDatasetTest, CPDataLoader
+from cp_dataset import CPDataset, CPDatasetTest
+from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, VGGLoss, GANLoss, load_checkpoint, save_checkpoint, define_D
 from tqdm import tqdm
 from tensorboardX import SummaryWriter

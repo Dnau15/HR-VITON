@@ -5,7 +5,8 @@ import torch.nn as nn
 import argparse
 import os
 import time
-from cp_dataset import CPDataset, CPDataLoader
+from cp_dataset import CPDataset
+from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, load_checkpoint, define_D
 
 from utils import *

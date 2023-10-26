@@ -6,7 +6,8 @@ from torchvision.utils import save_image
 import argparse
 import os
 import time
-from cp_dataset_test import CPDatasetTest, CPDataLoader
+from cp_dataset_test import CPDatasetTest
+from cp_dataloader import CPDataLoader
 
 from networks import ConditionGenerator, load_checkpoint, make_grid
 from network_generator import SPADEGenerator

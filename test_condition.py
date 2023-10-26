@@ -6,7 +6,8 @@ from torchvision.utils import make_grid, save_image
 import argparse
 import os
 import time
-from cp_dataset import CPDatasetTest, CPDataLoader
+from cp_dataset import CPDatasetTest
+from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, load_checkpoint, define_D
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
