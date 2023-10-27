@@ -4,6 +4,16 @@ import torch.nn as nn
 from torchvision.utils import make_grid
 from networks import make_grid as mkgrid
 
+import torch
+from torchvision import transforms
+from PIL import Image
+import torch.nn.functional as F
+import numpy as np
+import cv2
+import os
+from utils import cross_entropy2d
+
+import numpy as np
 import argparse
 import os
 import time
@@ -12,7 +22,6 @@ from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, VGGLoss, GANLoss, load_checkpoint, save_checkpoint, define_D
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from utils import *
 from torch.utils.data import Subset
 
 
@@ -354,16 +363,12 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
             tocg.train()
             board.add_scalar('val/iou', np.mean(iou_list), step + 1)
         
-        
-        # display
-        if (step + 1) % opt.display_count == 0:
+        # save
+        if (step + 1) % opt.save_count == 0:
             t = time.time() - iter_start_time
             if not opt.no_GAN_loss:
                 print("step: %8d, time: %.3f\nloss G: %.4f, L1_cloth loss: %.4f, VGG loss: %.4f, TV loss: %.4f CE: %.4f, G GAN: %.4f\nloss D: %.4f, D real: %.4f, D fake: %.4f"
                     % (step + 1, t, loss_G.item(), loss_l1_cloth.item(), loss_vgg.item(), loss_tv.item(), CE_loss.item(), loss_G_GAN.item(), loss_D.item(), loss_D_real.item(), loss_D_fake.item()), flush=True)
-
-        # save
-        if (step + 1) % opt.save_count == 0:
             save_checkpoint(tocg, os.path.join(opt.checkpoint_dir, opt.name, 'tocg_step_%06d.pth' % (step + 1)),opt)
             save_checkpoint(D, os.path.join(opt.checkpoint_dir, opt.name, 'D_step_%06d.pth' % (step + 1)),opt)
 
