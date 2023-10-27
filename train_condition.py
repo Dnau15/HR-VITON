@@ -56,15 +56,21 @@ def get_opt():
 
     parser.add_argument("--name", default="test")
     parser.add_argument("--gpu_ids", default="")
+    parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('-b', '--batch-size', type=int, default=8)
     parser.add_argument('--fp16', action='store_true', help='use amp')
 
     parser.add_argument("--dataroot", default="./data/")
+    parser.add_argument("--datamode", default="train")
     parser.add_argument("--data_list", default="train_pairs.txt")
+    parser.add_argument("--fine_width", type=int, default=192)
+    parser.add_argument("--fine_height", type=int, default=256)
 
+    parser.add_argument('--tensorboard_dir', type=str, default='tensorboard', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='save checkpoint infos')
     parser.add_argument('--tocg_checkpoint', type=str, default='', help='tocg checkpoint')
 
+    parser.add_argument("--tensorboard_count", type=int, default=100)
     parser.add_argument("--display_count", type=int, default=100)
     parser.add_argument("--save_count", type=int, default=10000)
     parser.add_argument("--load_step", type=int, default=0)
@@ -74,7 +80,8 @@ def get_opt():
     parser.add_argument("--output_nc", type=int, default=13)
     
     # network
-
+    parser.add_argument("--warp_feature", choices=['encoder', 'T1'], default="T1")
+    parser.add_argument("--out_layer", choices=['relu', 'conv'], default="relu")
     parser.add_argument('--Ddownx2', action='store_true', help="Downsample D's input to increase the receptive field")  
     parser.add_argument('--Ddropout', action='store_true', help="Apply dropout to D")
     parser.add_argument('--num_D', type=int, default=2, help='Generator ngf')
@@ -82,12 +89,15 @@ def get_opt():
     parser.add_argument('--cuda',default=False, help='cuda or cpu')
     # training
     parser.add_argument("--G_D_seperate", action='store_true')
+    parser.add_argument("--no_GAN_loss", action='store_true')
     parser.add_argument("--lasttvonly", action='store_true')
     parser.add_argument("--interflowloss", action='store_true', help="Intermediate flow loss")
     parser.add_argument("--clothmask_composition", type=str, choices=['no_composition', 'detach', 'warp_grad'], default='warp_grad')
+    parser.add_argument('--edgeawaretv', type=str, choices=['no_edge', 'last_only', 'weighted'], default="no_edge", help="Edge aware TV loss")
     parser.add_argument('--add_lasttv', action='store_true')
     
     # test visualize
+    parser.add_argument("--no_test_visualize", action='store_true')    
     parser.add_argument("--num_test_visualize", type=int, default=3)
     parser.add_argument("--test_datasetting", default="unpaired")
     parser.add_argument("--test_dataroot", default="./data/")
@@ -142,10 +152,8 @@ def train(opt, train_loader, test_loader, val_loader, tocg, D):
     # criterion
     criterionL1 = nn.L1Loss()
     criterionVGG = VGGLoss(opt)
-    if opt.fp16:
-        criterionGAN = GANLoss(use_lsgan=True, tensor=torch.cuda.HalfTensor)
-    else :
-        criterionGAN = GANLoss(use_lsgan=True, tensor=torch.cuda.FloatTensor if opt.gpu_ids else torch.Tensor)
+
+    criterionGAN = GANLoss(use_lsgan=True, tensor=torch.cuda.FloatTensor if opt.gpu_ids else torch.Tensor)
 
     # optimizer
     optimizer_G = torch.optim.Adam(tocg.parameters(), lr=opt.G_lr, betas=(0.5, 0.999))
