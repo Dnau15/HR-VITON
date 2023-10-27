@@ -21,7 +21,6 @@ from my_dataset import CPDataset, CPDatasetBase
 from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, VGGLoss, GANLoss, load_checkpoint, save_checkpoint, define_D
 from tqdm import tqdm
-from tensorboardX import SummaryWriter
 from torch.utils.data import Subset
 
 
@@ -57,21 +56,15 @@ def get_opt():
 
     parser.add_argument("--name", default="test")
     parser.add_argument("--gpu_ids", default="")
-    parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('-b', '--batch-size', type=int, default=8)
     parser.add_argument('--fp16', action='store_true', help='use amp')
 
     parser.add_argument("--dataroot", default="./data/")
-    parser.add_argument("--datamode", default="train")
     parser.add_argument("--data_list", default="train_pairs.txt")
-    parser.add_argument("--fine_width", type=int, default=192)
-    parser.add_argument("--fine_height", type=int, default=256)
 
-    parser.add_argument('--tensorboard_dir', type=str, default='tensorboard', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='save checkpoint infos')
     parser.add_argument('--tocg_checkpoint', type=str, default='', help='tocg checkpoint')
 
-    parser.add_argument("--tensorboard_count", type=int, default=100)
     parser.add_argument("--display_count", type=int, default=100)
     parser.add_argument("--save_count", type=int, default=10000)
     parser.add_argument("--load_step", type=int, default=0)
@@ -81,8 +74,7 @@ def get_opt():
     parser.add_argument("--output_nc", type=int, default=13)
     
     # network
-    parser.add_argument("--warp_feature", choices=['encoder', 'T1'], default="T1")
-    parser.add_argument("--out_layer", choices=['relu', 'conv'], default="relu")
+
     parser.add_argument('--Ddownx2', action='store_true', help="Downsample D's input to increase the receptive field")  
     parser.add_argument('--Ddropout', action='store_true', help="Apply dropout to D")
     parser.add_argument('--num_D', type=int, default=2, help='Generator ngf')
@@ -90,15 +82,12 @@ def get_opt():
     parser.add_argument('--cuda',default=False, help='cuda or cpu')
     # training
     parser.add_argument("--G_D_seperate", action='store_true')
-    parser.add_argument("--no_GAN_loss", action='store_true')
     parser.add_argument("--lasttvonly", action='store_true')
     parser.add_argument("--interflowloss", action='store_true', help="Intermediate flow loss")
     parser.add_argument("--clothmask_composition", type=str, choices=['no_composition', 'detach', 'warp_grad'], default='warp_grad')
-    parser.add_argument('--edgeawaretv', type=str, choices=['no_edge', 'last_only', 'weighted'], default="no_edge", help="Edge aware TV loss")
     parser.add_argument('--add_lasttv', action='store_true')
     
     # test visualize
-    parser.add_argument("--no_test_visualize", action='store_true')    
     parser.add_argument("--num_test_visualize", type=int, default=3)
     parser.add_argument("--test_datasetting", default="unpaired")
     parser.add_argument("--test_dataroot", default="./data/")
@@ -143,7 +132,7 @@ def get_fake_segmap(opt, fake_segmap, warped_cm_onehot, warped_clothmask_paired)
     return fake_segmap
 
 
-def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
+def train(opt, train_loader, test_loader, val_loader, tocg, D):
     # Model
     tocg.cuda()
     tocg.train()
@@ -208,45 +197,11 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
 
         loss_tv = 0
         
-        if opt.edgeawaretv == 'no_edge':
-            for flow in flow_list if not opt.lasttvonly else flow_list[-1:]:
-                    y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :]).mean()
-                    x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :]).mean()
-                    loss_tv = loss_tv + y_tv + x_tv
-        else:
-            if opt.edgeawaretv == 'last_only':
-                flow = flow_list[-1]
-                warped_clothmask_paired_down = F.interpolate(warped_clothmask_paired, flow.shape[1:3], mode='bilinear')
-                y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :])
-                x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :])
-                mask_y = torch.exp(-150*torch.abs(warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, 1:, :, :] - warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :-1, :, :]))
-                mask_x = torch.exp(-150*torch.abs(warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :, 1:, :] - warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :, :-1, :]))
-                y_tv = y_tv * mask_y
-                x_tv = x_tv * mask_x
-                y_tv = y_tv.mean()
-                x_tv = x_tv.mean()
+        # if opt.edgeawaretv == 'no_edge':
+        for flow in flow_list if not opt.lasttvonly else flow_list[-1:]:
+                y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :]).mean()
+                x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :]).mean()
                 loss_tv = loss_tv + y_tv + x_tv
-                
-            elif opt.edgeawaretv == 'weighted':
-                for i in range(5):
-                    flow = flow_list[i]
-                    warped_clothmask_paired_down = F.interpolate(warped_clothmask_paired, flow.shape[1:3], mode='bilinear')
-                    y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :])
-                    x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :])
-                    mask_y = torch.exp(-150*torch.abs(warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, 1:, :, :] - warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :-1, :, :]))
-                    mask_x = torch.exp(-150*torch.abs(warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :, 1:, :] - warped_clothmask_paired_down.permute(0, 2, 3, 1)[:, :, :-1, :]))
-                    y_tv = y_tv * mask_y
-                    x_tv = x_tv * mask_x
-                    y_tv = y_tv.mean() / (2 ** (4-i))
-                    x_tv = x_tv.mean() / (2 ** (4-i))
-                    loss_tv = loss_tv + y_tv + x_tv
-            
-            if opt.add_lasttv:
-                for flow in flow_list[-1:]:
-                    y_tv = torch.abs(flow[:, 1:, :, :] - flow[:, :-1, :, :]).mean()
-                    x_tv = torch.abs(flow[:, :, 1:, :] - flow[:, :, :-1, :]).mean()
-                    loss_tv = loss_tv + y_tv + x_tv
-            
 
         N, _, iH, iW = c_paired.size()
         # Intermediate flow loss
@@ -267,65 +222,34 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
         # generator
         CE_loss = cross_entropy2d(fake_segmap, label_onehot.transpose(0, 1)[0].long())
         
-        if opt.no_GAN_loss:
-            loss_G = (10 * loss_l1_cloth + loss_vgg + opt.tvlambda * loss_tv) + (CE_loss * opt.CElamda)
-            # step
-            optimizer_G.zero_grad()
-            loss_G.backward()
-            optimizer_G.step()
+
         
-        else:
-            fake_segmap_softmax = torch.softmax(fake_segmap, 1)
+        fake_segmap_softmax = torch.softmax(fake_segmap, 1)
 
-            pred_segmap = D(torch.cat((input1.detach(), input2.detach(), fake_segmap_softmax), dim=1))
+        pred_segmap = D(torch.cat((input1.detach(), input2.detach(), fake_segmap_softmax), dim=1))
+        
+        loss_G_GAN = criterionGAN(pred_segmap, True)
+        
+        # discriminator
+        fake_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), fake_segmap_softmax.detach()),dim=1))
+        real_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), label),dim=1))
+        loss_D_fake = criterionGAN(fake_segmap_pred, False)
+        loss_D_real = criterionGAN(real_segmap_pred, True)
+
+        # loss sum
+        loss_G = (10 * loss_l1_cloth + loss_vgg +opt.tvlambda * loss_tv) + (CE_loss * opt.CElamda + loss_G_GAN * opt.GANlambda)  # warping + seg_generation
+        loss_D = loss_D_fake + loss_D_real
+
+        # step
+        optimizer_G.zero_grad()
+        loss_G.backward()
+        optimizer_G.step()
+        
+        optimizer_D.zero_grad()
+        loss_D.backward()
+        optimizer_D.step()
             
-            loss_G_GAN = criterionGAN(pred_segmap, True)
-            
-            if not opt.G_D_seperate:  
-                # discriminator
-                fake_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), fake_segmap_softmax.detach()),dim=1))
-                real_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), label),dim=1))
-                loss_D_fake = criterionGAN(fake_segmap_pred, False)
-                loss_D_real = criterionGAN(real_segmap_pred, True)
 
-                # loss sum
-                loss_G = (10 * loss_l1_cloth + loss_vgg +opt.tvlambda * loss_tv) + (CE_loss * opt.CElamda + loss_G_GAN * opt.GANlambda)  # warping + seg_generation
-                loss_D = loss_D_fake + loss_D_real
-
-                # step
-                optimizer_G.zero_grad()
-                loss_G.backward()
-                optimizer_G.step()
-                
-                optimizer_D.zero_grad()
-                loss_D.backward()
-                optimizer_D.step()
-                
-            else: # train G first after that train D
-                # loss G sum
-                loss_G = (10 * loss_l1_cloth + loss_vgg + opt.tvlambda * loss_tv) + (CE_loss * opt.CElamda + loss_G_GAN * opt.GANlambda)  # warping + seg_generation
-                
-                # step G
-                optimizer_G.zero_grad()
-                loss_G.backward()
-                optimizer_G.step()
-                
-                # discriminator
-                with torch.no_grad():
-                    _, fake_segmap, _, _ = tocg(opt, input1, input2)
-                fake_segmap_softmax = torch.softmax(fake_segmap, 1)
-                
-                # loss discriminator
-                fake_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), fake_segmap_softmax.detach()),dim=1))
-                real_segmap_pred = D(torch.cat((input1.detach(), input2.detach(), label),dim=1))
-                loss_D_fake = criterionGAN(fake_segmap_pred, False)
-                loss_D_real = criterionGAN(real_segmap_pred, True)
-                
-                loss_D = loss_D_fake + loss_D_real
-                
-                optimizer_D.zero_grad()
-                loss_D.backward()
-                optimizer_D.step()
         # Vaildation
         if (step + 1) % opt.val_count == 0:
             tocg.eval()
@@ -361,7 +285,6 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                     iou_list.append(iou.item())
 
             tocg.train()
-            board.add_scalar('val/iou', np.mean(iou_list), step + 1)
         
         # save
         if (step + 1) % opt.save_count == 0:
@@ -384,21 +307,18 @@ def main():
     
     # create test dataset & loader
     test_loader = None
-    if not opt.no_test_visualize:
-        train_bsize = opt.batch_size
-        opt.batch_size = opt.num_test_visualize
-        opt.dataroot = opt.test_dataroot
-        opt.datamode = 'test'
-        opt.data_list = opt.test_data_list
-        test_dataset = CPDatasetBase(opt)
-        opt.batch_size = train_bsize
-        val_dataset = Subset(test_dataset, np.arange(2000))
-        test_loader = CPDataLoader(opt, test_dataset)
-        val_loader = CPDataLoader(opt, val_dataset)
+    #if not opt.no_test_visualize:
+    train_bsize = opt.batch_size
+    opt.batch_size = opt.num_test_visualize
+    opt.dataroot = opt.test_dataroot
+    opt.data_list = opt.test_data_list
+    test_dataset = CPDatasetBase(opt)
+    opt.batch_size = train_bsize
+    val_dataset = Subset(test_dataset, np.arange(2000))
+    test_loader = CPDataLoader(opt, test_dataset)
+    val_loader = CPDataLoader(opt, val_dataset)
     # visualization
-    if not os.path.exists(opt.tensorboard_dir):
-        os.makedirs(opt.tensorboard_dir)
-    board = SummaryWriter(log_dir=os.path.join(opt.tensorboard_dir, opt.name))
+
 
     # Model
     input1_nc = 4  # cloth + cloth-mask
@@ -411,7 +331,7 @@ def main():
         load_checkpoint(tocg, opt.tocg_checkpoint)
 
     # Train
-    train(opt, train_loader, val_loader, test_loader, board, tocg, D)
+    train(opt, train_loader, val_loader, test_loader, tocg, D)
 
     # Save Checkpoint
     save_checkpoint(tocg, os.path.join(opt.checkpoint_dir, opt.name, 'tocg_final.pth'),opt)
