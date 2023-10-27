@@ -27,7 +27,6 @@ just convenient but truly enjoyable and trustworthy.
 ## Progress check
 Train Condition Implementation: \
 The train_condition has been successfully implemented by our team, marking a significant milestone in our project. This crucial step lays the foundation for generating clothing styles on various individuals. \
-To elaborate further: \
 
 ### 1.1 Model Training Progress:
 
