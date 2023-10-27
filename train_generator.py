@@ -8,7 +8,7 @@ import os
 import time
 from cp_dataset import CPDataset
 from cp_dataloader import CPDataLoader
-from cp_dataset_test import CPDatasetTest
+from my_dataset import CPDatasetTest
 from networks import ConditionGenerator, VGGLoss, load_checkpoint, save_checkpoint, make_grid
 from network_generator import SPADEGenerator, MultiscaleDiscriminator, GANLoss
 

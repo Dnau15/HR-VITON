@@ -7,7 +7,7 @@ from networks import make_grid as mkgrid
 import argparse
 import os
 import time
-from cp_dataset import CPDataset, CPDatasetTest
+from my_dataset import CPDataset, CPDatasetBase
 from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, VGGLoss, GANLoss, load_checkpoint, save_checkpoint, define_D
 from tqdm import tqdm
@@ -317,14 +317,14 @@ def train(opt, train_loader, test_loader, val_loader, board, tocg, D):
                     # input2
                     parse_agnostic = inputs['parse_agnostic'].cuda()
                     densepose = inputs['densepose'].cuda()
-                    openpose = inputs['pose'].cuda()
+                    #openpose = inputs['pose'].cuda()
                     # GT
                     label_onehot = inputs['parse_onehot'].cuda()  # CE
                     label = inputs['parse'].cuda()  # GAN loss
                     parse_cloth_mask = inputs['pcm'].cuda()  # L1
                     im_c = inputs['parse_cloth'].cuda()  # VGG
                     # visualization
-                    im = inputs['image']
+                    #im = inputs['image']
                     
                     input1 = torch.cat([c_paired, cm_paired], 1)
                     input2 = torch.cat([parse_agnostic, densepose], 1)
@@ -425,7 +425,7 @@ def main():
         opt.dataroot = opt.test_dataroot
         opt.datamode = 'test'
         opt.data_list = opt.test_data_list
-        test_dataset = CPDatasetTest(opt)
+        test_dataset = CPDatasetBase(opt)
         opt.batch_size = train_bsize
         val_dataset = Subset(test_dataset, np.arange(2000))
         test_loader = CPDataLoader(opt, test_dataset)

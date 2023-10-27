@@ -6,7 +6,7 @@ from torchvision.utils import make_grid, save_image
 import argparse
 import os
 import time
-from cp_dataset import CPDatasetTest
+from my_dataset import CPDatasetBase
 from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, load_checkpoint, define_D
 from tqdm import tqdm
@@ -162,7 +162,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
     
     # create test dataset & loader
-    test_dataset = CPDatasetTest(opt)
+    test_dataset = CPDatasetBase(opt)
     test_loader = CPDataLoader(opt, test_dataset)
     
     # visualization
