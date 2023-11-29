@@ -6,7 +6,7 @@ from torchvision.utils import make_grid as make_image_grid
 import argparse
 import os
 import time
-from cp_dataset import CPDatasetBase, CPDataset
+from cp_dataset import CPDatasetBase, CPDataset, CPDatasetTest
 from cp_dataloader import CPDataLoader
 from networks import ConditionGenerator, VGGLoss, load_checkpoint, save_checkpoint, make_grid
 from network_generator import SPADEGenerator, MultiscaleDiscriminator, GANLoss
