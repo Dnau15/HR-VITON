@@ -614,13 +614,13 @@ def main():
     opt.dataroot = opt.test_dataroot
     opt.datamode = 'test'
     opt.data_list = opt.test_data_list
-    test_dataset = CPDataset(opt)
+    test_dataset = CPDatasetTest(opt)
     test_dataset = Subset(test_dataset, np.arange(500))
     test_loader = CPDataLoader(opt, test_dataset)
     
     # test vis loader
     opt.batch_size = opt.num_test_visualize
-    test_vis_dataset = CPDataset(opt)
+    test_vis_dataset = CPDatasetTest(opt)
     test_vis_loader = CPDataLoader(opt, test_vis_dataset)
     
     # visualization
